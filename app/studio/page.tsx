@@ -1,129 +1,64 @@
 "use client";
-import { useState, useRef } from "react";
-
+import { useState, useRef, useEffect } from "react";
 export default function Page(){
-  const [script, setScript] = useState("I was broke in Makhuduthamaga, Limpopo. Everyone laughed when I coded at 3AM. Now my AI twin makes videos while I sleep. Link in bio before they delete this.");
-  const [face, setFace] = useState<string | null>(null);
-  const [status, setStatus] = useState("👇 Upload your face first");
+  const [script, setScript] = useState("I was broke in Makhuduthamaga, Limpopo. Everyone laughed when I coded at 3AM. Now my AI twin talks while I sleep. Link in bio.");
+  const [face, setFace] = useState<string|null>(null);
+  const [status, setStatus] = useState("Upload face");
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  const handleUpload = (e:any) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { setFace(reader.result as string); setStatus("✅ Face loaded! Now generate viral video") };
-    reader.readAsDataURL(file);
-  }
-
-  const viralHooks = [
-    "I was BROKE in Makhuduthamaga. No job. My mom said stop playing with computer. At 3AM I built an AI that hires people to talk for me. First night 847 views. Now it prints while I sleep.",
-    "POV: You live in Limpopo and your AI clone makes more money than your lecturer. No camera. No editing. Just code. Link in bio.",
-    "They said Alfred you will never make it with AI. Now they ask me for jobs. I built a factory where my face talks 24/7 in English, Sepedi and Zulu.",
-  ];
-
-  const generateVideo = async () => {
-    if(!face){ alert("Upload your face first bro!"); return; }
-    try{
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext("2d")!;
-      const avatar = new Image();
-      avatar.src = face;
-      await new Promise(r=> avatar.onload = r);
-
-      setStatus("🎬 DIRECTING YOUR AI TWIN...");
-      const stream = canvas.captureStream(30);
-      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')? 'video/webm;codecs=vp9' : 'video/webm';
-      const rec = new MediaRecorder(stream, {mimeType: mime});
-      let chunks:Blob[]=[]; rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);
-      rec.onstop=()=>{
-        const blob = new Blob(chunks, {type:mime});
-        const url = URL.createObjectURL(blob);
-        const a=document.createElement('a'); a.href=url; a.download=`FINAL-ULTRA-X-${Date.now()}.webm`; a.click();
-        setStatus("✅ FINAL VIDEO DOWNLOADED! Post to TikTok now! 🔥");
-      };
-      rec.start(100);
-
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(script);
-      u.rate=0.92; u.pitch=0.9; u.volume=1;
-      speechSynthesis.speak(u);
-
-      let frame=0; const total=30*14;
-      let audioLevel=0;
-
-      const draw=()=>{
-        // Background studio
-        const grad = ctx.createLinearGradient(0,0,0,1920);
-        grad.addColorStop(0,"#0a0a0a"); grad.addColorStop(1,"#1a0033");
-        ctx.fillStyle=grad; ctx.fillRect(0,0,1080,1920);
-
-        // Blurred face background
-        ctx.globalAlpha=0.15; ctx.drawImage(avatar, 0,0,1080,1920); ctx.globalAlpha=1;
-
-        // Main face - talking effect
-        const isTalking = speechSynthesis.speaking;
-        // Realistic mouth: stretch lower 30% of face
-        const mouthOpen = isTalking? (Math.abs(Math.sin(frame/2.5))*22 + Math.sin(frame/1.2)*6 + 8) : 0;
-
-        ctx.save();
-        ctx.beginPath(); ctx.arc(540, 680, 310, 0, Math.PI*2); ctx.clip();
-        // Draw full face
-        ctx.drawImage(avatar, 230, 370, 620, 620);
-        // Draw mouth overlay stretched
-        if(isTalking){
-          // lower face stretch for lip-sync illusion
-          ctx.drawImage(avatar,
-            avatar.width*0.28, avatar.height*0.62, avatar.width*0.44, avatar.height*0.22,
-            340, 820, 400, 110 + mouthOpen
-          );
-        }
-        ctx.restore();
-
-        // Neon border
-        ctx.strokeStyle="#00FF88"; ctx.lineWidth=10; ctx.shadowColor="#00FF88"; ctx.shadowBlur=20;
-        ctx.beginPath(); ctx.arc(540,680,315,0,Math.PI*2); ctx.stroke(); ctx.shadowBlur=0;
-
-        // Subtitles - viral style
-        ctx.fillStyle="#fff"; ctx.textAlign="center";
-        const words = script.split(' '); const idx=Math.floor((frame/total)*words.length);
-        const line1 = words.slice(idx, idx+6).join(' ');
-        const line2 = words.slice(idx+6, idx+12).join(' ');
-
-        ctx.fillStyle="rgba(0,0,0,0.85)"; ctx.fillRect(30, 1150, 1020, 320);
-        ctx.fillStyle="#fff"; ctx.font="900 52px system-ui"; ctx.fillText(line1,540,1240,950);
-        ctx.font="900 52px system-ui"; ctx.fillStyle="#00FF88"; ctx.fillText(line2,540,1310,950);
-
-        ctx.font="800 24px system-ui"; ctx.fillStyle="#888"; ctx.fillText("AUTONOMOUS ULTRA X • FINAL",540,1450);
-
-        frame++;
-        if(frame < total) requestAnimationFrame(draw);
-        else rec.stop();
-      };
-      draw();
-      setTimeout(()=>{ if(rec.state==='recording') rec.stop(); speechSynthesis.cancel(); }, 14500);
-
-    }catch(e:any){ setStatus("Error: "+e.message) }
-  }
-
+  const [ready, setReady] = useState(false);
+  useEffect(()=>{ const l=()=>{ if(speechSynthesis.getVoices().length>0) setReady(true); }; l(); speechSynthesis.onvoiceschanged=l; },[]);
+  const onFile=(e:any)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ setFace(r.result as string); setStatus("✅ Face loaded"); }; r.readAsDataURL(f); };
+  const gen=async()=>{
+    if(!face) return alert("Upload face");
+    const canvas=canvasRef.current!; const ctx=canvas.getContext("2d")!;
+    const img=new Image(); img.src=face; await new Promise(r=>img.onload=r as any);
+    setStatus("🎬 Talking...");
+    const stream=canvas.captureStream(30);
+    const rec=new MediaRecorder(stream,{mimeType:'video/webm'}); let ch:Blob[]=[]; rec.ondataavailable=e=>e.data.size&&ch.push(e.data);
+    rec.onstop=()=>{ const b=new Blob(ch,{type:'video/webm'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`ULTRA-X-PERFECT-${Date.now()}.webm`; a.click(); setStatus("✅ PERFECT VIDEO SAVED!"); };
+    rec.start(100);
+    speechSynthesis.cancel(); const ut=new SpeechSynthesisUtterance(script); ut.rate=0.9; ut.volume=1;
+    const vs=speechSynthesis.getVoices(); if(vs.length) ut.voice=vs.find(v=>v.lang.includes('en'))||vs[0]; speechSynthesis.speak(ut);
+    let fr=0; const total=30*13;
+    const draw=()=>{
+      ctx.fillStyle="#000"; ctx.fillRect(0,0,1080,1920);
+      ctx.drawImage(img,0,0,1080,1920); // full face background blurred slightly
+      // face circle clean
+      ctx.save(); ctx.beginPath(); ctx.arc(540,650,320,0,Math.PI*2); ctx.clip();
+      ctx.drawImage(img, 180, 250, 720, 720);
+      // PERFECT MOUTH - draw realistic mouth instead of slicing
+      const talking=speechSynthesis.speaking;
+      if(talking){
+        const open = Math.abs(Math.sin(fr/2.8))*28 + Math.abs(Math.sin(fr/3.5))*12 + 6;
+        // mouth position (estimate lower face)
+        const mx=540, my=860;
+        ctx.fillStyle="#120000"; // inside mouth dark
+        ctx.beginPath(); ctx.ellipse(mx, my, 55, open, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle="#fff"; // teeth
+        ctx.beginPath(); ctx.ellipse(mx, my-8, 40, Math.min(open*0.5,10), 0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle="#a00"; // tongue
+        if(open>15){ ctx.beginPath(); ctx.ellipse(mx, my+8, 25, 8, 0,0,Math.PI*2); ctx.fill(); }
+      }
+      ctx.restore();
+      ctx.strokeStyle="#00FF88"; ctx.lineWidth=12; ctx.shadowColor="#00FF88"; ctx.shadowBlur=20; ctx.beginPath(); ctx.arc(540,650,328,0,Math.PI*2); ctx.stroke(); ctx.shadowBlur=0;
+      const w=script.split(' '); const i=Math.floor((fr/total)*w.length);
+      ctx.fillStyle="rgba(0,0,0,0.9)"; ctx.fillRect(20,1150,1040,300);
+      ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.font="900 48px system-ui"; ctx.fillText(w.slice(i,i+6).join(' '),540,1230,950);
+      ctx.fillStyle="#00FF88"; ctx.fillText(w.slice(i+6,i+12).join(' '),540,1305,950);
+      fr++; if(fr<total) requestAnimationFrame(draw); else { rec.stop(); speechSynthesis.cancel(); }
+    }; draw();
+    setTimeout(()=>{ if(rec.state==='recording') rec.stop(); },13500);
+  };
   return (
-    <div style={{background:"#000",color:"#fff",minHeight:"100vh",padding:16,fontFamily:"system-ui"}}>
-      <h1>⚡ ULTRA X V4 FINAL</h1>
-      <p style={{color:"#00FF88",fontSize:13}}>REAL TALKING PEOPLE • FINAL VERSION</p>
-
-      <div style={{background:"#111",padding:12,borderRadius:12,marginTop:10,border:"2px dashed #00FF88"}}>
-        <p>📸 Step 1: Upload YOUR Face</p>
-        <input type="file" accept="image/*" onChange={handleUpload} style={{width:"100%",color:"#fff"}} />
-        {face && <img src={face} style={{width:80,height:80,borderRadius:40,marginTop:8,objectFit:"cover",border:"3px solid #00FF88"}} />}
-      </div>
-
-      <button onClick={()=>setScript(viralHooks[Math.floor(Math.random()*3)])} style={{width:"100%",padding:12,background:"#222",color:"#fff",borderRadius:12,marginTop:10}}>🎲 RANDOM VIRAL HOOK</button>
-      <textarea value={script} onChange={e=>setScript(e.target.value)} style={{width:"100%",height:120,background:"#111",color:"#fff",borderRadius:12,padding:12,marginTop:8}} />
-
-      <button onClick={generateVideo} style={{width:"100%",padding:18,background:"#00FF88",color:"#000",fontWeight:900,fontSize:20,borderRadius:14,marginTop:10}}>🎬 GENERATE FINAL TALKING VIDEO</button>
-      <p style={{color:"#00FF88",fontWeight:700,marginTop:8}}>{status}</p>
-      <canvas ref={canvasRef} width={1080} height={1920} style={{width:"100%",borderRadius:20,background:"#0a0a0a",marginTop:8}} />
-      <p style={{color:"#555",fontSize:11,marginTop:10}}>FINAL: Your real face talks. Upload front-facing photo. No sunglasses. Good light. This is what goes viral in 2026.</p>
+    <div style={{background:"#000",color:"#fff",minHeight:"100vh",padding:14,fontFamily:"system-ui"}}>
+      <h2>⚡ V4.2 PERFECT MOUTH</h2>
+      <p style={{color:ready?"#0F8":"#F55",fontSize:12}}>{ready?"🔊 Voice Ready":"Loading voice"}</p>
+      <input type="file" accept="image/*" onChange={onFile} style={{width:"100%"}}/>
+      {face&&<img src={face} style={{width:70,height:70,borderRadius:35,objectFit:"cover",border:"2px solid #0F8"}}/>}
+      <textarea value={script} onChange={e=>setScript(e.target.value)} style={{width:"100%",height:90,background:"#111",color:"#fff",borderRadius:12,padding:10,marginTop:8}}/>
+      <button onClick={gen} style={{width:"100%",padding:16,background:"#00FF88",color:"#000",fontWeight:900,fontSize:19,borderRadius:14,marginTop:8}}>🎬 GENERATE PERFECT TALKING VIDEO</button>
+      <p style={{color:"#0F8",fontWeight:700}}>{status}</p>
+      <canvas ref={canvasRef} width={1080} height={1920} style={{width:"100%",borderRadius:20,background:"#111"}}/>
     </div>
   )
 }
