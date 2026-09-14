@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(req: NextRequest) {
   try {
     const { text } = await req.json()
-    const apiKey = process.env.ELEVENLABS_API_KEY
-    const voiceId = '21m00Tcm4TlvDq8ikWAM' // Rachel - free, works
 
+    const apiKey = process.env.ELEVENLABS_API_KEY
     if (!apiKey) {
-      return NextResponse.json({ error: 'Missing API Key' }, { status: 500 })
+      return NextResponse.json({ error: 'ELEVENLABS_API_KEY missing in Vercel' }, { status: 500 })
     }
 
-    const response = await fetch(
+    // RACHEL - Free voice, always works
+    const voiceId = '21m00Tcm4TlvDq8ikWAM'
+
+    const elevenRes = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
         method: 'POST',
@@ -20,22 +22,32 @@ export async function POST(req: NextRequest) {
           'Accept': 'audio/mpeg',
         },
         body: JSON.stringify({
-          text: text.slice(0, 4000), // limit for free plan
+          text: text.substring(0, 1000), // free plan limit
           model_id: 'eleven_monolingual_v1',
-          voice_settings: { stability: 0.7, similarity_boost: 0.7 }
+          voice_settings: {
+            stability: 0.75,
+            similarity_boost: 0.75,
+            style: 0.3,
+            use_speaker_boost: true
+          }
         }),
       }
     )
 
-    if (!response.ok) {
-      const err = await response.text()
-      return NextResponse.json({ error: err }, { status: 500 })
+    if (!elevenRes.ok) {
+      const errText = await elevenRes.text()
+      console.log('ElevenLabs error:', errText)
+      return NextResponse.json({ error: errText }, { status: 500 })
     }
 
-    const audio = await response.arrayBuffer()
-    return new NextResponse(audio, {
-      headers: { 'Content-Type': 'audio/mpeg' },
+    const audioBuffer = await elevenRes.arrayBuffer()
+    return new NextResponse(audioBuffer, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.byteLength.toString()
+      },
     })
+
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
