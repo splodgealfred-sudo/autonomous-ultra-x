@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           text: text.substring(0, 1000), // free plan limit
-          model_id: 'eleven_monolingual_v2',
+          model_id: 'eleven_flash_v2_5',
           voice_settings: {
             stability: 0.75,
             similarity_boost: 0.75,
